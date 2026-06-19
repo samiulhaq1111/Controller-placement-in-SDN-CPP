@@ -29,6 +29,10 @@ from config import (
     HYBRID_CORRELATIONS_CSV,
     HYBRID_SCORES_CSV,
     HYBRID_TOP_NODES_PNG,
+    KCENTER_ANALYSIS_TXT,
+    KCENTER_COVERAGE_CSV,
+    KCENTER_COVERAGE_PNG,
+    KCENTER_VS_CENTRALITY_TXT,
     OUTPUT_DIR,
     PLOTS_DIR,
     RANDOM_SEED,
@@ -37,6 +41,7 @@ from config import (
 )
 from comparison import StrategyComparison
 from evaluator import PlacementEvaluator
+from kcenter_analysis import KCenterAnalysis
 from metrics import GraphMetrics
 from strategies import HybridScorer, PlacementStrategies
 from topology import TopologyLoader
@@ -116,6 +121,28 @@ def main() -> None:
     scorer.export_correlations(HYBRID_CORRELATIONS_CSV)
     scorer.generate_top_nodes_plot(HYBRID_TOP_NODES_PNG)
     scorer.export_analysis(HYBRID_ANALYSIS_TXT)
+
+    # ═══════════════════════════════════════════
+    # Milestone 3 – K-Center Analysis
+    # ═══════════════════════════════════════════
+
+    # ── Step 9: K-Center detailed analysis ────
+    kcenter_controllers = placements["KCenter"]
+    kcenter = KCenterAnalysis(
+        graph=graph,
+        distance_matrix=metrics.distance_matrix,  # type: ignore[arg-type]
+        controllers=kcenter_controllers,
+        nodes=metrics.nodes,
+    )
+    kcenter.export_analysis(KCENTER_ANALYSIS_TXT)
+    kcenter.export_coverage_csv(KCENTER_COVERAGE_CSV)
+    kcenter.generate_coverage_plot(KCENTER_COVERAGE_PNG)
+
+    # ── Step 10: K-Center vs centrality report ─
+    kcenter.export_vs_centrality_analysis(
+        KCENTER_VS_CENTRALITY_TXT,
+        comparison_results=comparison.results,
+    )
 
     logger.info("Pipeline finished successfully.")
 

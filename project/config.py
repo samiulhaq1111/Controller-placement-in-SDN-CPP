@@ -42,6 +42,12 @@ HYBRID_CORRELATIONS_CSV: Path = OUTPUT_DIR / "hybrid_correlations.csv"
 HYBRID_ANALYSIS_TXT: Path = OUTPUT_DIR / "hybrid_analysis.txt"
 HYBRID_TOP_NODES_PNG: Path = PLOTS_DIR / "hybrid_top_nodes.png"
 
+# KCenter strategy outputs
+KCENTER_ANALYSIS_TXT: Path = OUTPUT_DIR / "kcenter_analysis.txt"
+KCENTER_COVERAGE_CSV: Path = OUTPUT_DIR / "kcenter_coverage.csv"
+KCENTER_COVERAGE_PNG: Path = PLOTS_DIR / "kcenter_coverage.png"
+KCENTER_VS_CENTRALITY_TXT: Path = OUTPUT_DIR / "kcenter_vs_centrality_analysis.txt"
+
 # ──────────────────────────────────────────────
 # Default controller placement (sample)
 # ──────────────────────────────────────────────

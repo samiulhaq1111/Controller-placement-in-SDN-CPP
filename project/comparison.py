@@ -53,6 +53,8 @@ class StrategyResult:
         Population variance of controller loads.
     importance_score : float
         Sum of betweenness centrality for chosen controllers.
+    controller_spread : float
+        Average pairwise hop distance between selected controllers.
     controller_loads : dict[int, int]
         ``{controller: managed_switch_count}``.
     """
@@ -63,6 +65,7 @@ class StrategyResult:
     maximum_latency: float = 0.0
     load_variance: float = 0.0
     importance_score: float = 0.0
+    controller_spread: float = 0.0
     controller_loads: dict[int, int] = field(default_factory=dict)
 
 
@@ -89,6 +92,7 @@ class StrategyComparison:
         {"key": "maximum_latency",  "label": "Maximum Latency",    "direction": "min"},
         {"key": "load_variance",    "label": "Load Variance",      "direction": "min"},
         {"key": "importance_score", "label": "Importance Score",   "direction": "max"},
+        {"key": "controller_spread","label": "Controller Spread",  "direction": "max"},
     ]
 
     def __init__(
@@ -142,6 +146,7 @@ class StrategyComparison:
                 maximum_latency=obj.maximum_controller_latency(),
                 load_variance=obj.load_variance(),
                 importance_score=obj.controller_importance_score(self.betweenness_scores),
+                controller_spread=self._compute_controller_spread(controllers),
                 controller_loads=obj.controller_load_distribution(),
             )
             self.results.append(result)
@@ -175,6 +180,7 @@ class StrategyComparison:
                 f"{c}: {n}" for c, n in sorted(r.controller_loads.items())
             )
             print(f"  Controller Loads   : {{{loads_str}}}")
+            print(f"  Controller Spread  : {r.controller_spread:.4f}")
             print("-" * 50)
 
         # Best-strategy summary
@@ -211,6 +217,7 @@ class StrategyComparison:
                 "MaximumLatency": r.maximum_latency,
                 "LoadVariance": round(r.load_variance, 4),
                 "ImportanceScore": round(r.importance_score, 6),
+                "ControllerSpread": round(r.controller_spread, 4),
                 "ControllerLoads": str(r.controller_loads),
             })
         df = pd.DataFrame(rows)
@@ -271,15 +278,15 @@ class StrategyComparison:
         lines.append("-" * 60)
         header = (
             f"  {'Method':<14s} {'AvgLat':>8s} {'MaxLat':>8s} "
-            f"{'LoadVar':>10s} {'ImpScore':>10s}  Controllers"
+            f"{'LoadVar':>10s} {'ImpScore':>10s} {'Spread':>8s}  Controllers"
         )
         lines.append(header)
-        lines.append("  " + "-" * 56)
+        lines.append("  " + "-" * 64)
         for r in self.results:
             lines.append(
                 f"  {r.method:<14s} {r.average_latency:>8.4f} "
                 f"{r.maximum_latency:>8.0f} {r.load_variance:>10.4f} "
-                f"{r.importance_score:>10.6f}  {r.controllers}"
+                f"{r.importance_score:>10.6f} {r.controller_spread:>8.4f}  {r.controllers}"
             )
         lines.append("")
         lines.append("=" * 60)
@@ -371,3 +378,28 @@ class StrategyComparison:
         if direction == "min":
             return min(self.results, key=lambda r: getattr(r, metric_key))
         return max(self.results, key=lambda r: getattr(r, metric_key))
+
+    def _compute_controller_spread(self, controllers: list[int]) -> float:
+        """Compute the average pairwise hop distance between controllers.
+
+        Parameters
+        ----------
+        controllers : list[int]
+            Selected controller node IDs.
+
+        Returns
+        -------
+        float
+            Mean pairwise shortest-path distance.
+        """
+        if len(controllers) < 2:
+            return 0.0
+
+        node_index: dict[int, int] = {n: i for i, n in enumerate(self.nodes)}
+        total = 0.0
+        count = 0
+        for i, c1 in enumerate(controllers):
+            for c2 in controllers[i + 1:]:
+                total += self.distance_matrix[node_index[c1]][node_index[c2]]
+                count += 1
+        return total / count if count > 0 else 0.0

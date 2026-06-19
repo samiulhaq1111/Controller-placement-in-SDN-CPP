@@ -11,6 +11,7 @@ Strategies
 - **Betweenness** : top-k nodes by betweenness centrality
 - **Closeness**   : top-k nodes by closeness centrality
 - **Hybrid**      : weighted combination of normalised graph metrics
+- **KCenter**     : greedy k-center minimising maximum controller latency
 
 New strategies can be added by implementing any callable that accepts
 ``(graph, k, **kwargs)`` and returns ``list[int]``.
@@ -212,6 +213,78 @@ class PlacementStrategies:
     # Convenience: run all strategies at once
     # ──────────────────────────────────────────
 
+    # ──────────────────────────────────────────────
+    # Strategy 6 – K-Center Placement
+    # ──────────────────────────────────────────────
+
+    def k_center_placement(self, k: int) -> list[int]:
+        """Greedy k-center placement minimising maximum latency.
+
+        Algorithm
+        ---------
+        1. Select the first controller as the node with highest closeness
+           centrality (best central starting point).
+        2. Iteratively select the node that maximises the minimum distance
+           to any already-selected controller, until *k* controllers are
+           chosen.
+
+        Parameters
+        ----------
+        k : int
+            Number of controllers.
+
+        Returns
+        -------
+        list[int]
+            Sorted list of selected controller node IDs.
+        """
+        self._validate_k(k)
+
+        # Pre-compute closeness centrality for the seed node
+        cc: dict[int, float] = nx.closeness_centrality(self.graph)
+
+        # Pre-compute all-pairs shortest-path distances (dict of dicts)
+        path_lengths: dict[int, dict[int, int]] = dict(
+            nx.all_pairs_shortest_path_length(self.graph)
+        )
+
+        # Step 1 – pick the node with highest closeness centrality
+        first = max(self.nodes, key=lambda n: (cc.get(n, 0.0), -n))
+        selected: list[int] = [first]
+
+        # Step 2 – greedily pick the furthest node from existing controllers
+        while len(selected) < k:
+            best_node: int | None = None
+            best_min_dist: float = -1.0
+
+            for candidate in self.nodes:
+                if candidate in selected:
+                    continue
+                # Minimum distance from candidate to any selected controller
+                min_dist = min(
+                    path_lengths[candidate].get(s, float("inf"))
+                    for s in selected
+                )
+                # Maximise this minimum distance; break ties by node id asc
+                if (min_dist > best_min_dist) or (
+                    min_dist == best_min_dist
+                    and (best_node is None or candidate < best_node)
+                ):
+                    best_min_dist = min_dist
+                    best_node = candidate
+
+            if best_node is None:
+                break  # no more candidates available
+            selected.append(best_node)
+
+        result = sorted(selected)
+        logger.info("K-Center placement (k=%d): %s", k, result)
+        return result
+
+    # ──────────────────────────────────────────────
+    # Convenience: run all strategies at once
+    # ──────────────────────────────────────────────
+
     def all_strategies(
         self,
         k: int,
@@ -237,6 +310,7 @@ class PlacementStrategies:
             "Betweenness": self.betweenness_based_placement(k),
             "Closeness": self.closeness_based_placement(k),
             "Hybrid": self.hybrid_placement(k),
+            "KCenter": self.k_center_placement(k),
         }
 
     # ──────────────────────────────────────────
